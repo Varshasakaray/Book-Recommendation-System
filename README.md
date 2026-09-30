@@ -1,254 +1,479 @@
 # Behavior-Aware Personalized Book Recommendation System
 
-## PROJECT PROPOSAL
+A behavior-aware personalized book recommendation system that predicts the probability that a user will read a book within **90 days** after adding it to their shelf.
 
-### Behavior-Aware Personalized Book Recommendation System
+Instead of recommending books only because they appear similar to a user's interests, the system focuses on a practical behavioral question:
 
-**Using Shelf-to-Read Conversion Prediction**
+> **After a user adds a book, how likely are they to actually read it within the next 90 days?**
 
----
-
-## 1. Problem Statement
-
-Traditional book recommendation systems mainly recommend books based on similarity, ratings, or popularity.
-
-However, a book that a user may like is not always a book that the user will actually read. Our project studies historical user behavior and recommends books that both match the user's interests and have a higher probability of being converted from a saved/shelf book into a read book.
+The system uses historical user behavior, genre-specific behavior, author-specific behavior, ratings, book-length behavior, and book metadata to estimate this conversion probability. The resulting probability is used to rank books and generate transparent, rule-based explanations.
 
 ---
 
-## 2. Completion Prediction of a Book
+## Project Objective
 
-We use an observable outcome:
+The main objective is to build a personalized recommendation system around **shelf-to-read conversion**.
 
-**Shelf-to-Read Conversion**
-
----
-
-## 3. Project Objective
-
-To build a personalized book recommendation system that uses each user's historical behavior to:
-
-* Understand which genres, authors, and book lengths the user prefers.
-* Measure the user's historical shelf-to-read conversion behavior.
-* Predict the probability that a user will read a candidate book within a fixed time horizon **T**.
-* Rank books using both preference similarity and predicted conversion probability.
-* Provide simple rule-based explanations without using an LLM.
-
----
-
-## 4. Dataset Attributes Available
-
-The current dataset contains the following attributes:
-
-| Attribute          | How We Use It                                                    |
-| ------------------ | ---------------------------------------------------------------- |
-| `user_id`          | Unique identifier of the user.                                   |
-| `book_id`          | Unique identifier of the book.                                   |
-| `is_read`          | Indicates whether the book is marked/read by the user.           |
-| `rating`           | Rating given by the user; used as an explicit preference signal. |
-| `started_at`       | Recorded date when the user started the book, if available.      |
-| `read_at`          | Recorded date when the book was read/finished, if available.     |
-| `date_added`       | Date when the user added the book to their shelf/library.        |
-| `num_pages`        | Number of pages in the book.                                     |
-| `authors`          | Author(s) of the book.                                           |
-| `genre`            | Category information used as genre or topic information.         |
-| `publication_year` | Year in which the book was published.                            |
-
----
-
-## 5. Shelf-to-Read Conversion
-
-For every user-book record, `date_added` is treated as the starting anchor.
-
-We select a fixed horizon **T** (for example, **180 days**) and check whether the book is recorded as read within that period.
-
-### Target
+For a user \(u\), book \(b\), and fixed time horizon \(T = 90\) days:
 
 $$
-P(\text{Read within T} \mid \text{User, Book, Historical Behavior})
+P(\text{Read within 90 days} \mid \text{User, Book, Historical Behavior})
 $$
 
-### Example
+The system learns from historical interactions while preserving chronological order.
 
-| `date_added` | `read_at`    | Days After Added |                  T = 180 Days | Target |
-| ------------ | ------------ | ---------------: | ----------------------------: | -----: |
-| 1 Jan        | 15 Feb       |               45 |                      Within T |      1 |
-| 1 Jan        | 20 Dec       |              353 |                     Outside T |      0 |
-| 1 Jan        | Not observed |                — | After full observation window |      — |
-
----
-
-## 6. How We Build a Behavioral Profile for Each User
-
-The system processes each user's historical interactions separately.
-
-### A. Overall Conversion Behavior
-
-For each user, calculate how many previously added books became read within **T**.
-
-$$
-Overall Conversion Rate = \frac{{Converted Books within T}} {{Eligible Books Added}}
-$$
-
-### B. Genre-Specific Behavior
-
-For every genre, calculate how often the user converted books in that genre into reads.
-
-For example, a user may convert **Fantasy** books much more often than **Suspense** books.
-
-### C. Rating Preference
-
-Use historical ratings to identify what the user liked.
-
-Features can include:
-
-* Average rating by genre.
-* Average rating for previously read books.
-
-### D. Author Preference
-
-Count previous interactions with authors and identify authors whose books the user has frequently read or rated highly.
-
-### E. Book-Length Preference
-
-Using `num_pages`, identify the book-length ranges that the user historically converts and rates highly.
-
----
-
-## 7. Example: One User
-
-Suppose User **U1** has the following historical profile:
-
-* Overall shelf-to-read conversion rate: **70%**
-* Fantasy conversion rate: **85%**
-* Mystery conversion rate: **70%**
-* Suspense conversion rate: **30%**
-* Preferred book length: approximately **200–450 pages**
-* Fantasy average rating: **4.6/5**
-* Frequently interacted with **Author A** and **Author B**
-
-If a new candidate book is a **Fantasy** book, around **350 pages**, and written by a preferred author, it receives a high behavioral and preference score.
-
----
-
-## 8. Recommendation Method
-
-### Step 1: Candidate Generation
-
-Generate a set of candidate books using content-based similarity from:
-
-* Genre
-* Authors
-* Other book metadata
-
-### Step 2: Preference Score
-
-Calculate how well each candidate matches the user's historical interests, such as:
-
-* Genre preference
-* Author preference
-* Rating history
-* Book-length preference
-
-**Content-Based Filtering**
-
-### Step 3: Conversion Prediction
-
-For each user-candidate pair, create behavioral features from the user's past history and predict:
-
-**Probability that the user will read the book within T — Logistic Regression**
-
-### Step 4: Final Ranking
-
-Combine the user's preference score with the predicted conversion probability.
-
-$$
-\text{Final Score}
-={XGBoost}({Preference Score},{Conversion Probability})
-$$
-
-Please correc this
-
-The top-ranked books become the final personalized recommendations.
-
----
-
-## 9. Application / Model Flow
+### Recommendation Pipeline
 
 ```text
-RAW DATASET
-    ↓
-Data Cleaning and Date Parsing
-    ↓
-Create Shelf-to-Read Target Using date_added and Horizon T
-    ↓
-Build Historical Profile for Each User
-    ↓
-Candidate Book Generation
-    ↓
-Preference Scoring
-    ↓
-Conversion Probability Prediction
-    ↓
-Combine Scores and Rank Books
-    ↓
-Top-N Personalized Recommendations
-    ↓
-Rule-Based "Why This Book?" Explanation
+Historical User Behavior
+          +
+     Book Information
+          ↓
+ Conversion Prediction
+          ↓
+P(Read within 90 days)
+          ↓
+     Book Ranking
+          ↓
+Explainable Recommendation
 ```
 
 ---
 
-## 10. Explainability
+## Core Prediction Target
 
-Explanations will be produced using transparent rules based directly on calculated features.
+For an interaction with `date_added` and `read_at`:
 
-### Example
+### Target = 1
 
-> "Recommended because you have historically converted Fantasy books at a high rate, rated similar books highly, and this book matches your preferred book-length range."
+The book is recorded as read within 90 days after `date_added`.
 
----
+### Target = 0
 
-## 11. Project Novelty
+The complete 90-day observation window has passed and the book was not converted within that window.
 
-* The system does not only recommend books that look similar to a user's interests.
-* It models whether the user historically converts added/saved books into actual reads.
-* It learns different behavioral patterns for each user, including genre, author, rating, and book-length behavior.
-* Recommendations are explainable through transparent rules and features.
+### Immature Observations
 
----
+Interactions whose complete 90-day observation window has not elapsed are **not used as supervised outcomes**.
 
-## 12. Why Users May Use This Instead of Asking an LLM
-
-An LLM can provide general book suggestions based on a prompt.
-
-Our system is designed to work with a persistent history of user-book interactions and calculate measurable, user-specific behavioral patterns.
-
-Its main purpose is not simply to suggest a good book, but to rank books based on both:
-
-1. Personal preference
-2. Probability score
+This avoids incorrectly treating insufficiently observed interactions as negative examples.
 
 ---
 
-## 13. Short Proposal Summary
+## Why This Approach?
 
-Our project is a **behavior-aware personalized book recommendation system**.
+Many recommendation systems focus primarily on whether a user may like a book.
 
-Based on the available dataset, we do not use the traditional completion-rate definition because Goodreads-style data does not reliably show which books were started and then abandoned.
+This project focuses on an additional behavioral objective:
 
-Instead, we define an observable target called **shelf-to-read conversion**.
+> A book may be relevant to a user, but will the user actually convert it from a shelf addition into a read within a defined period?
 
-Using `date_added` as the anchor and a horizon **T**, we predict whether a user will read a book within that period.
+The project therefore treats **shelf-to-read conversion within a fixed horizon** as the main prediction objective.
 
-For every user, we build a historical profile using:
+---
 
-* Overall conversion behavior
-* Genre-specific conversion
-* Ratings
-* Author preference
-* Book-length preference
+## Behavioral Signals
 
-Candidate books are generated using book metadata, then ranked using both **preference score** and **predicted conversion probability**.
+### Overall Conversion Behavior
 
-The recommendation explanation is **rule-based**.
+The user's historical shelf-to-read conversion rate is:
+
+$$
+ConversionRate_{90d} = \frac {Previous books converted within 90 days} {Previous eligible books}
+$$
+
+### Genre-Specific Behavior
+
+Users may behave differently across genres.
+
+Example:
+
+| Genre              | Historical Conversion Rate |
+| ------------------ | -------------------------: |
+| Fantasy            |                       0.82 |
+| Mystery & Thriller |                       0.64 |
+| Comedy             |                       0.31 |
+| Science Fiction    |                       0.76 |
+
+### Author-Specific Behavior
+
+The system can also learn author-specific conversion behavior.
+
+Example:
+
+| Author   | Historical Conversion Rate |
+| -------- | -------------------------: |
+| Author A |                       0.90 |
+| Author B |                       0.72 |
+| Author C |                       0.41 |
+
+### Historical Ratings
+
+Ratings attached to previously interacted books are used as historical user behavior.
+
+
+### Book-Length Behavior
+
+`num_pages` can be used to represent the user's historical relationship with book length, such as the average size of previously read books.
+
+---
+
+## Temporal Feature Engineering
+
+Temporal correctness is a central requirement of the project.
+
+For a prediction event at time \(t\):
+
+$$
+X_{u,b,t} = History(u,<t)
+$$
+
+Only information available **before the current `date_added`** may be used to construct features.
+
+The current interaction's future outcome must never be used to construct its own input features.
+
+### Information That Must Not Be Used as Current-Row Features
+
+* Current target
+* Current `read_at`
+* Current `is_read`
+* Future rating for the current interaction
+* Future reading information
+* Future interactions of the same user
+
+The current interaction is added to the historical state **only after its features have been calculated**.
+
+---
+
+## Recommendation Flow
+
+```text
+                    USER INTERACTION HISTORY
+                               │
+                               ▼
+                       DATA PREPROCESSING
+                               │
+                               ▼
+                  TEMPORAL BEHAVIOR
+                   FEATURE ENGINEERING
+                               │
+                               ▼
+                    USER BEHAVIOR SIGNALS
+                               │
+                               │
+                               ▼
+                       BOOK INFORMATION
+                               │
+                               ▼
+                       CONVERSION MODEL
+                               │
+                               ▼
+                   P(Read within 90 days)
+                               │
+                               ▼
+                         BOOK RANKING
+                               │
+                               ▼
+                      TOP RECOMMENDATIONS
+                               │
+                               ▼
+                    RULE-BASED EXPLANATION
+```
+
+---
+
+## Machine Learning
+
+The conversion task is treated as a **binary classification** problem.
+
+### Candidate Models
+
+* Logistic Regression
+* Random Forest
+* XGBoost
+
+Logistic Regression provides an interpretable baseline, while nonlinear models can capture more complex behavioral relationships.
+
+The final model should be selected through experimental evaluation rather than assuming a particular algorithm will always perform best.
+
+---
+
+## Model Inputs
+
+The final model combines historical user behavior with information about the book being evaluated.
+
+### User Behavioral Information
+
+Examples:
+
+* Historical conversion rate
+* Previous interaction counts
+* Genre-specific conversion behavior
+* Author-specific conversion behavior
+* Historical ratings
+* Historical average pages read
+
+### Book Information
+
+Examples:
+
+* Number of pages
+* Genre information
+* Author information
+* Other metadata available at recommendation time
+
+The model outputs:
+
+$$
+P(\text{Read within 90 days})
+$$
+
+for a user-book pair.
+
+---
+
+## Recommendation Ranking
+
+After the model produces conversion probabilities, books can be ranked by predicted probability.
+
+Example:
+
+| Book   | Predicted Conversion Probability |
+| ------ | -------------------------------: |
+| Book A |                             0.86 |
+| Book B |                             0.72 |
+| Book C |                             0.64 |
+| Book D |                             0.31 |
+
+The ranking is directly tied to the project's **90-day conversion objective**.
+
+---
+
+## Explainability
+
+The system uses **rule-based explanations instead of an LLM**.
+
+Example:
+
+> Recommended because the user has historically converted 8 of 10 eligible Fantasy books within 90 days, has given high ratings to previous books, and the book matches their historical book-length behavior.
+
+Explanation components are generated from calculated behavioral features, making them:
+
+* Transparent
+* Reproducible
+* Auditable
+* Directly connected to the recommendation logic
+
+---
+
+## Evaluation
+
+### Classification Metrics
+
+* ROC-AUC
+* PR-AUC
+* Log Loss
+* Brier Score
+
+## Data Processing
+
+The data-processing pipeline includes:
+
+1. Load interaction data
+2. Clean and validate dates
+3. Standardize genre information
+4. Standardize author identifiers
+5. Define the 90-day target
+6. Exclude observations without a fully observable target
+7. Build chronological behavioral features
+8. Prepare data for model training
+
+Particular attention is given to **temporal leakage** and **observation-window maturity**.
+
+---
+
+## Technology Stack
+
+### Frontend
+
+* React
+* Vite
+* Tailwind CSS
+
+### Backend
+
+* FastAPI
+* Python
+
+### Database
+
+* PostgreSQL
+
+### Machine Learning / Data Processing
+
+* Pandas
+* NumPy
+* Scikit-learn
+* XGBoost
+
+### Development
+
+* Jupyter / Google Colab
+* Git
+* GitHub
+
+---
+
+## Project Structure
+
+```text
+book-recommendation-system/
+│
+├── README.md
+├── .gitignore
+├── .env.example
+│
+├── frontend/
+│   ├── src/
+│   ├── public/
+│   └── package.json
+│
+├── backend/
+│   ├── app/
+│   ├── routes/
+│   ├── services/
+│   └── requirements.txt
+│
+├── ml/
+│   ├── notebooks/
+│   │   ├── 01_data_preparation_target_90d.ipynb
+│   │   ├── 02_data_cleaning_and_genres.ipynb
+│   │   └── 03_temporal_feature_engineering.ipynb
+│   │
+│   └── src/
+│       ├── preprocessing/
+│       ├── features/
+│       ├── training/
+│       ├── evaluation/
+│       └── inference/
+│
+├── data/
+│   ├── raw/
+│   ├── interim/
+│   └── processed/
+│
+├── models/
+│
+├── database/
+│   ├── schema/
+│   └── seed/
+│
+├── scripts/
+├── tests/
+└── docs/
+```
+
+---
+
+## System Architecture
+
+```text
+                         ┌─────────────────────┐
+                         │   User / Client     │
+                         └──────────┬──────────┘
+                                    │
+                                    ▼
+                         ┌─────────────────────┐
+                         │   React Frontend    │
+                         │   + Tailwind CSS    │
+                         └──────────┬──────────┘
+                                    │
+                                    ▼
+                         ┌─────────────────────┐
+                         │    FastAPI API      │
+                         └──────────┬──────────┘
+                                    │
+                   ┌────────────────┼──────────────────┐
+                   │                │                  │
+                   ▼                ▼                  ▼
+           ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+           │ PostgreSQL   │ │ Feature      │ │ ML Model     │
+           │              │ │ Engineering  │ │              │
+           └──────────────┘ └──────┬───────┘ └──────┬───────┘
+                                   │                  │
+                                   └────────┬─────────┘
+                                            ▼
+                                  ┌─────────────────────┐
+                                  │ Conversion          │
+                                  │ Probability         │
+                                  └──────────┬──────────┘
+                                             │
+                                             ▼
+                                  ┌─────────────────────┐
+                                  │ Book Ranking        │
+                                  └──────────┬──────────┘
+                                             │
+                                             ▼
+                                  ┌─────────────────────┐
+                                  │ Rule-Based          │
+                                  │ Explanations        │
+                                  └──────────┬──────────┘
+                                             │
+                                             ▼
+                                  ┌─────────────────────┐
+                                  │ Recommendations     │
+                                  └─────────────────────┘
+```
+
+---
+
+## Development Roadmap
+
+### Phase 1 — Data Preparation
+
+* Clean interaction data
+* Validate dates
+* Standardize genres
+* Standardize author IDs
+* Define the 90-day target
+
+### Phase 2 — Behavioral Modeling
+
+* Build chronological user behavior features
+* Calculate historical conversion statistics
+* Calculate genre-specific behavior
+* Calculate author-specific behavior
+* Calculate historical rating and page signals
+
+### Phase 3 — Model Development
+
+* Prepare numerical ML features
+* Train baseline models
+* Train nonlinear models
+* Compare performance
+* Evaluate probability quality
+
+### Phase 4 — Recommendation Engine
+
+* Connect user behavior to book metadata
+* Generate candidate books
+* Calculate conversion probability
+* Rank candidates
+* Return top recommendations
+
+### Phase 5 — Explainability
+
+* Generate rule-based explanations
+* Display relevant behavioral evidence
+* Connect explanations to recommendation reasons
+
+### Phase 6 — Application
+
+* Build React interface
+* Connect FastAPI backend
+* Store application data in PostgreSQL
+* Integrate the trained model
+* Display personalized recommendations and explanations
+
+
+---
