@@ -1,0 +1,4 @@
+goodreads_books.csv
+__pycache__/
+.venv/
+env/
