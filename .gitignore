@@ -1,5 +1,12 @@
-goodreads_books.csv
+# Ignore raw data
+bookwise/data/
+*.csv
+
+# Ignore model binaries
+*.pkl
+*.npz
+bookwise/models/
+
+# Ignore Python cache
 __pycache__/
-.venv/
-env/
-data/
+*.pyc
